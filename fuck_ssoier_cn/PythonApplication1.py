@@ -2,7 +2,6 @@ import requests
 import re
 import xlwt
 import urllib3
-from io import BytesIO
 from bs4 import BeautifulSoup  
 import bs4
 
@@ -10,31 +9,47 @@ import bs4
 By Chr_
 Email: chr@chrxw.com
 '''
+S=requests.session()
+
+def analyze_index():
+    url='http://ybt.ssoier.cn:8088/index.php'
+    html=S.get(url).content
+    html=str(html,encoding='utf-8',errors='ignore')
+    soup=BeautifulSoup(html,'lxml')
+    x=soup.find(name='div',attrs={'class':'menuDiv'})
+    for li in x.ul.find_all(name='li'):
+        print(li.get_text())
+
 
 def download_exam():
     print('爬爬爬，开始咯')
-    s=requests.session()
+    
     workbook = xlwt.Workbook(encoding = 'utf-8')
-    for j in range(1,102,1):
+     
+
+
+    for j in range(1000,1671,1):
         txt=[]
-        url='http://lib.nbdp.net/paper/%d.html'  % j
+        url='http://ybt.ssoier.cn:8088/index.php#'
         html=s.get(url).content
         html=str(html,encoding='utf-8',errors='ignore')
-        soup = BeautifulSoup(html,'lxml')  
-        exams=soup.find_all(name='div',attrs={'s':'math3'})
-        title=str(j)+soup.title.get_text()
+        soup = BeautifulSoup(html,'lxml')
+        
+        title=str(j)+soup.find(attrs={'class':'pcontent'}).get_test()
         worksheet = workbook.add_sheet(title)
         exam=[(url,title)]
+
+
         print('当前进度[%d/100]：%s [%s]' % (j,exam[0][1],exam[0][0]))
-        for x in exams:
-            out=analyzesoup(x)
-            exam.append(out)
+        
+        
         sheetwriter(exam,worksheet)
     workbook.save('dump.xls')
     print('保存为./dump.xls')
     pass
 
 def analyzesoup(soupobj:bs4.element.NavigableString):
+    return()
     def notNone(obj):
         if obj is None:
             return(False)
@@ -148,4 +163,4 @@ def sheetwriter(list,sheetobj):
     pass
 
 if __name__=="__main__":
-    download_exam()
+    analyze_index()
