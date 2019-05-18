@@ -13,10 +13,9 @@ S = requests.session()
 BASE_URL = 'http://ybt.ssoier.cn:8088/'
 
 def main():
-    #analyze_indexpage(generate_pagetree())
-    analyze_testpagelist([(1000,"5")],"")
+    analyze_indexpage(generate_pagetree())
 
-#解析首页，返回章节大纲列表 格式：[(章名,(篇名,链接)),……]
+#解析首页，返回章节大纲列表 格式：[(章名,(篇名,链接)]
 def generate_pagetree():
     html = S.get(BASE_URL + 'index.php').content
     html = str(html,encoding='utf-8',errors='ignore')
@@ -31,7 +30,7 @@ def generate_pagetree():
         pagetree.append((pianming,zhanglist))
     return(pagetree)
 
-#解析章节大纲，返回题目列表 格式：[(pid,节名),……]
+#解析章节大纲，返回题目列表
 def analyze_indexpage(pagetree:list):
     print('爬爬爬，开始咯')
     workbook = xlwt.Workbook(encoding = 'utf-8')
@@ -64,9 +63,9 @@ def analyze_indexpage(pagetree:list):
                             return(True)
                     return(False)
                 tds = table.find_all(specifictd)
-                a = [tds[i] for i in range(0,len(tds),2)]
-                b = [tds[i] for i in range(1,len(tds),2)]
-                tds = a + b
+                a=[tds[i] for i in range(0,len(tds),2)]
+                b=[tds[i] for i in range(1,len(tds),2)]
+                tds=a+b
                 for td in tds:
                     tm = td.string
                     pid = td.previous_sibling.string
@@ -78,49 +77,21 @@ def analyze_indexpage(pagetree:list):
 
 
 
-#解析题目页，返回题目详情
+#解析题目页，返回题目详情，
 def analyze_testpagelist(testlist,sheetobj):
      def notNone(obj):
         if obj is None:
             return(False)
         return(True)
-     i = 0
      for item in testlist:
-
         if(item[0]):#有pid
-            html = S.get(BASE_URL + 'problem_show.php?pid=' + str(item[0])).content
+            html = S.get(BASE_URL + 'problem_show.php?pid=' + pid).content
             html = str(html,encoding='utf-8',errors='ignore')
             soup = BeautifulSoup(html,'lxml')
-            td = soup.find(name='td',attrs={'class':'pcontent'})
-            font=td.find(name='font',attrs={'size':'2'},recursive=False)
+            form=soup.find(name='td',attrs={'class':'pcontent'})
 
-            tmms=[]
-            input=[]
-            output=[]
-            inputexp=[]
-            outputexp=[]
-
-            flag=0
-            for tag in font.find_all(True):
-                if(tag.name=='font' or tag.name=='div' or tag.name=='br'):
-                    continue
-                if(tag.name=='h3'):
-                    flag+=1
-                    continue
-                
-                if(flag==1):
-                    tmms.append(tag.string)
-                elif(flag==2):
-                    input.append(tag.string)
-                elif(flag==3):
-                    output.append(tag.string)
-                elif(flag==4):
-                    inputexp.append(tag.string)
-                elif(flag==5):
-                    outputexp.append(tag.string)
-                elif(flag==6):
-                    source=(tag.string,tag.attrs['href'])
-                    break
+        else:#无pid
+            pass
 
 
 def download_exam():
