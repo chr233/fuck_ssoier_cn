@@ -9,249 +9,253 @@ import bs4
 By Chr_
 Email: chr@chrxw.com
 '''
+
 S = requests.session()
 BASE_URL = 'http://ybt.ssoier.cn:8088/'
+INDEX_URL = 'http://ybt.ssoier.cn:8088/index.php'
+TEST_URL = 'http://ybt.ssoier.cn:8088/problem_show.php?pid='
+SUBMIT_URL = 'http://ybt.ssoier.cn:8088/submit.php?pid='
 
-def main():
-    #analyze_indexpage(generate_pagetree())
-    analyze_testpagelist([(1000,"5")],"")
-
-#解析首页，返回章节大纲列表 格式：[(章名,(篇名,链接)),……]
-def generate_pagetree():
-    html = S.get(BASE_URL + 'index.php').content
+#解析首页
+def analyze_index():
+    print('开始咯')
+    workbook = xlwt.Workbook(encoding = 'utf-8')
+    html = S.get(INDEX_URL).content
     html = str(html,encoding='utf-8',errors='ignore')
     soup = BeautifulSoup(html,'lxml')
-    x = soup.find(name='div',attrs={'class':'menuDiv'})
-    pagetree = []
-    for child in x.find_all(attrs={'href': "#"}):
-        pianming = child.h3.string.strip()
+    menu = soup.find(name='div',attrs={'class':'menuDiv'})
+    for child in menu.find_all(attrs={'href': "#"}):
+        pianming = fstr(child.h3.string.strip())
+        print('爬取 %s' % pianming)
         zhanglist = []
         for li in child.parent.ul.find_all(name='li'):
-            zhanglist.append((li.string,li.a.attrs['href']))
-        pagetree.append((pianming,zhanglist))
-    return(pagetree)
+            timulist = analyze_zhangindex(li.a.attrs['href'])
+            zhangming = li.string
+            print(' 爬取 %s' % zhangming)
+            zhanglist.append((zhangming,timulist))
+        sheetobj = workbook.add_sheet(pianming)
+        print('保存数据……')
+        write_to_sheet(pianming,zhanglist,sheetobj)
+        workbook.save('dump.xls')
+        print('写入完成')
+    print('数据保存在 ./dump.xls 中')
 
-#解析章节大纲，返回题目列表 格式：[(pid,节名),……]
-def analyze_indexpage(pagetree:list):
-    print('爬爬爬，开始咯')
-    workbook = xlwt.Workbook(encoding = 'utf-8')
-    for pian in pagetree:
-        for url in pian[1]:
-            S.get(BASE_URL + url[1])
-            header = {
-                'Referer': 'http://ybt.ssoier.cn:8088/' + url[1]
-                }
-            html = S.get(BASE_URL,headers=header).content
-            html = str(html,encoding='utf-8',errors='ignore')
-            soup = BeautifulSoup(html,'lxml')
-            
-            table = soup.find(name='table',attrs={'class':'plist'})
-            lieshu = len(table.find_all(name='th'))
-            test = []
-            if lieshu == 4:
-                for td in table.find_all(name='td',attrs={'class':'xlist'}):
-                    tm = td.string
-                    pid = td.previous_sibling.string
-                    test.append((pid,tm))
-            elif lieshu == 8:
-                i = 0
-                def specifictd(tag):
-                    if(tag.name == 'td'):
-                        dict = tag.attrs
-                        if(('class' in dict) and (dict['class'][0] == 'xlist')):
-                            return(True)
-                        elif(tag.find(name='font',attrs={'color':'#001290'})):
-                            return(True)
-                    return(False)
-                tds = table.find_all(specifictd)
-                a = [tds[i] for i in range(0,len(tds),2)]
-                b = [tds[i] for i in range(1,len(tds),2)]
-                tds = a + b
-                for td in tds:
-                    tm = td.string
-                    pid = td.previous_sibling.string
-                    test.append((pid,tm))
-
-            sheetobj = workbook.add_sheet(pian[0])
-            analyze_testpagelist(test,sheetobj)
-            
-
-
-
-#解析题目页，返回题目详情
-def analyze_testpagelist(testlist,sheetobj):
-     def notNone(obj):
-        if obj is None:
-            return(False)
-        return(True)
-     i = 0
-     for item in testlist:
-
-        if(item[0]):#有pid
-            html = S.get(BASE_URL + 'problem_show.php?pid=' + str(item[0])).content
-            html = str(html,encoding='utf-8',errors='ignore')
-            soup = BeautifulSoup(html,'lxml')
-            td = soup.find(name='td',attrs={'class':'pcontent'})
-            font=td.find(name='font',attrs={'size':'2'},recursive=False)
-
-            tmms=[]
-            input=[]
-            output=[]
-            inputexp=[]
-            outputexp=[]
-
-            flag=0
-            for tag in font.find_all(True):
-                if(tag.name=='font' or tag.name=='div' or tag.name=='br'):
-                    continue
-                if(tag.name=='h3'):
-                    flag+=1
-                    continue
-                
-                if(flag==1):
-                    tmms.append(tag.string)
-                elif(flag==2):
-                    input.append(tag.string)
-                elif(flag==3):
-                    output.append(tag.string)
-                elif(flag==4):
-                    inputexp.append(tag.string)
-                elif(flag==5):
-                    outputexp.append(tag.string)
-                elif(flag==6):
-                    source=(tag.string,tag.attrs['href'])
-                    break
-
-
-def download_exam():
-    for j in range(1000,1671,1):
-        txt = []
-        url = 'http://ybt.ssoier.cn:8088/index.php#'
-        html = s.get(url).content
-        html = str(html,encoding='utf-8',errors='ignore')
-        soup = BeautifulSoup(html,'lxml')
-
-        title = str(j) + soup.find(attrs={'class':'pcontent'}).get_test()
-        worksheet = workbook.add_sheet(title)
-        exam = [(url,title)]
-
-        print('当前进度[%d/100]：%s [%s]' % (j,exam[0][1],exam[0][0]))
-
-        sheetwriter(exam,worksheet)
-    workbook.save('dump.xls')
-    print('保存为./dump.xls')
-    pass
-
-def analyzesoup(soupobj:bs4.element.NavigableString):
+#解析指定章，返回题目列表 格式：[(pid,题目名,题目详情),(pid,题目名,题目详情),……]
+def analyze_zhangindex(url):
+    S.get(BASE_URL + url)
+    header = {
+        'Referer': 'http://ybt.ssoier.cn:8088/' + url
+        }
+    html = S.get(BASE_URL,headers=header).content
+    html = str(html,encoding='utf-8',errors='ignore')
+    soup = BeautifulSoup(html,'lxml')
     
-
-    result = soupobj.find(name='p',attrs={'class':'pt1'})#题干
-    if notNone(result):
-        tigan = result.get_text().strip()
-
-        result = soupobj.find(name='img')#有无图片
-        if (notNone(result)):
-            hasimg = True
-            tupian = []
-            for i in soupobj.find_all(name='img'):
-                tupian.append(i.attrs['src'])
-        else:
-            hasimg = False
-
-        result = soupobj.find(name='li')#如果是选择题
-        if notNone(result):
-            xuanxiang = []
-            for i in soupobj.find_all(name='li'):
-                xuanxiang.append(i.get_text())
-            result = soupobj.find(attrs={'class':'col-md-3 column xz'})
-            if notNone(result):
-                daan = result.get_text()
+    table = soup.find(name='table',attrs={'class':'plist'})
+    lieshu = len(table.find_all(name='th'))
+    testlist = []
+    if lieshu == 4:
+        for td in table.find_all(name='td',attrs={'class':'xlist'}):
+            pid = td.previous_sibling.string
+            tm = td.string
+            xq = analyze_testpage(pid)
+            print('   爬取 [%s] %s' % (str(pid),tm))
+            testlist.append((pid,tm,xq))
+    elif lieshu == 8:
+        def specifictd(tag): 
+            if(tag.name == 'td'):
+                dict = tag.attrs
+                if(('class' in dict) and (dict['class'][0] == 'xlist')):
+                    return(True)
+                elif(tag.find(name='font',attrs={'color':'#001290'})):
+                    return(True)
+            return(False)
+        tds = table.find_all(specifictd)
+        a = [tds[i] for i in range(0,len(tds),2)]
+        b = [tds[i] for i in range(1,len(tds),2)]
+        tds = a + b
+        for td in tds:
+            pid = td.previous_sibling.string
+            tm = td.string
+            if(pid):
+                xq = analyze_testpage(pid)
+                print('   爬取 [%s] %s' % (str(pid),tm))
+                testlist.append((pid,tm,xq))
             else:
-                daan = '未找到答案'
+                print('  爬取 %s' % tm)
+                testlist.append((tm,))
+    return(testlist)
 
-            if hasimg:
-                out = {'tg':tigan,'xx':xuanxiang,'da':daan,'tp':tupian}
+#解析题目页，返回题目详情，格式：{'tm','i','o','ie','oe',['t'],['s']}
+def analyze_testpage(pid):
+    html = S.get(TEST_URL + str(pid)).content
+    html = str(html,encoding='utf-8',errors='ignore')
+    soup = BeautifulSoup(html,'lxml')
+
+    try:
+        td = soup.find(name='td',attrs={'class':'pcontent'})
+        font = td.find(name='font',attrs={'size':'2'},recursive=False)
+        tp = []
+        for img in td.find_all(name='img'):
+            tp.append(BASE_URL + img.attrs['src'])
+    except AttributeError:
+        print('***无法读取题目，题号：%s' % str(pid))
+        return({'error':'题目不正常，或者是权限类题目!'})
+
+    tm = []
+    input = []
+    output = []
+    inputexp = []
+    outputexp = []
+    tip = []
+    source = None
+
+    flag = 0
+
+    for tag in font.find_all(True):
+        if(tag.name == 'font' or tag.name == 'div' or tag.name == 'br'):
+            continue
+        elif(tag.name == 'h3'):
+            if(tag.string != '【来源】'):
+                flag+=1
             else:
-                out = {'tg':tigan,'xx':xuanxiang,'da':daan}
+                flag = -1
+            continue
 
-            return(out)
+        if(flag == 1):
+            tm.append(fstr(tag.string))
+        elif(flag == 2):
+            input.append(fstr(tag.string))
+        elif(flag == 3):
+            output.append(fstr(tag.string))
+        elif(flag == 4):
+            try:
+                inputexp.extend(fstr(tag.string,'^$^$^$').split('^$^$^$'))
+            except:
+                print('***读取题目信息遇到错误，题号 %s' %  str(pid))
+        elif(flag == 5):
+            try:
+                outputexp.extend(fstr(tag.string,'^$^$^$').split('^$^$^$'))
+            except:
+                print('***读取题目信息遇到错误，题号 %s' %  str(pid))
+        elif(flag == 6):
+            tip.append(fstr(tag.string))
+        elif(flag == -1):
+            try:
+                if((tag.string).upper() != 'NO' and tag.string != '无'):
+                    source = (BASE_URL + tag.attrs['href'],tag.string)
+                    print('!!!!!!!!!!%s,%s' % (source[0],source[1]))
+            finally:
+                break
+    if(not tm):
+        tm='无'
+    if(not input):
+        input=['无']
+    if(not output):
+        output=['无']
+    if(not inputexp):
+        inputexp=['无']
+    if(not outputexp):
+        outputexp=['无']
+    test = {'tm':tm,'i':input,'o':output,'ie':inputexp,'oe':outputexp}
+    if(tp):
+        test['tp'] = tp
+    if(tip):
+        test['t'] = tip
+    if(source):
+        test['s'] = source
+    return(test)
 
-        result = soupobj.find(name='pre')#是否存在代码块
-        if notNone(result):
-            daima = result.get_text()
-            if hasimg:
-                out = {'tg':tigan,'dm':daima,'tp':tupian}
-            else:
-                out = {'tg':tigan,'dm':daima}
-            return(out)
-        else:
-            result = soupobj.find(name='span',attrs={'class':'tiankong'})
-            if notNone(result):
-                jianda = result.get_text()
+#写出数据到工作簿中
+def write_to_sheet(title,list,sheetobj):
+    style = xlwt.XFStyle()
+    style.alignment.horz = 0x03#HORZ_RIGHT
+    sheetobj.write(0,1, label = '篇')
+    sheetobj.write(0,2, label = title)
+    sheetobj.write(0,3, xlwt.Formula('HYPERLINK("https://blog.chrxw.com";"Generate By Chr_")'))
+    sheetobj.col(0).width = 6 * 256   #PID
+    sheetobj.col(1).width = 10 * 256 #标记
+    sheetobj.col(2).width = 200 * 256 #题目描述
 
-            if hasimg:
-                out = {'tg':tigan,'jd':jianda,'tp':tupian}
-            else:
-                out = {'tg':tigan,'jd':jianda}
-            return(out)
-
-        return(None)
-
-def sheetwriter(list,sheetobj):
-    sheetobj.write(0,1, xlwt.Formula('HYPERLINK("%s";"%s")' % list[0]))
-    sheetobj.write(0,2, xlwt.Formula('HYPERLINK("https://blog.chrxw.com";"Generate By Chr_")'))
-    sheetobj.col(0).width = 0
-    sheetobj.col(1).width = 80 * 256
-    sheetobj.col(2).width = 40 * 256
-    sheetobj.col(3).width = 40 * 256
-    sheetobj.col(4).width = 40 * 256
-    sheetobj.col(5).width = 40 * 256
     _row = 1
-    for item in list:
-        #print(item)
-        if 'tp' in item:#插图片
-            _col = 7
-            for tp in item['tp']:
-                url = 'http://lib.nbdp.net/' + tp
-                sheetobj.write(_row,_col, xlwt.Formula('HYPERLINK("%s";"查看图片")' % url))
-                _col+=1
-            pass
+    for zhang in list:
+        _row+=1
+        sheetobj.write(_row,1, label ='章')
+        sheetobj.write(_row,2, label =zhang[0])
+        _row+=1
 
-        if 'xx' in item:#选择题
-            sheetobj.write(_row,1, label =item['tg'])
-            sheetobj.write(_row,0, label =item['da'])
-            col = 2
-            for i in item['xx']:
-                sheetobj.write(_row,col, label =i)
-                col+=1
-            _row+=1
-            continue
-
-        if 'dm' in item:#填空题
-            lines = item['tg'].splitlines(False)
-            _row+=1
-            for line in lines:
-                sheetobj.write(_row,1, label =line)
+        for test in zhang[1]:
+            #print(test)
+            if (len(test) == 1):
                 _row+=1
-            lines = item['dm'].splitlines(False)
-            for line in lines:
-                sheetobj.write(_row,1, label =line)
+                sheetobj.write(_row,1, label ='节')
+                sheetobj.write(_row,2, label =test[0])
                 _row+=1
-            continue
+            else:
+                _row+=1
+                sheetobj.write(_row,0, label =test[0])
+                sheetobj.write(_row,1, label ='题目')
+                sheetobj.write(_row,2, label =test[1])
+                sheetobj.write(_row + 1,0, xlwt.Formula('HYPERLINK("%s";"原题")' % (TEST_URL + test[0])))
+                sheetobj.write(_row + 2,0, xlwt.Formula('HYPERLINK("%s";"提交")' % (SUBMIT_URL + test[0])))
 
-        if 'jd' in item:#简答题
-            row1 = _row
-            row2 = _row
-            lines = item['tg'].splitlines(False)
-            for line in lines:
-                sheetobj.write(row1,1, label =line)
-                row1+=1
-            lines = item['jd'].splitlines(False)
-            for line in lines:
-                sheetobj.write(row2,0, label =line)
-                row2+=1
-            _row = (row1 if row1 > row2 else row2) + 1
+                if 'tp' in test[2]:#有无图片
+                    _col = 3
+                    for i in test[2]['tp']:
+                        sheetobj.write(_row,_col,  xlwt.Formula('HYPERLINK("%s";"查看图片")' % i))
+                        _col+=1
+
+                _row+=1
+                
+                if 'error' in test[2]:
+                    sheetobj.write(_row,1, label ='题目描述')
+                    sheetobj.write(_row,2, label =test[2]['error'])
+                    _row+=1
+                    continue
+
+                sheetobj.write(_row,1, label ='题目描述')
+                for i in test[2]['tm']:
+                    sheetobj.write(_row,2, label =i)
+                    _row+=1
+
+                sheetobj.write(_row,1, label ='输入')
+                for i in test[2]['i']:
+                    sheetobj.write(_row,2, label =i)
+                    _row+=1
+
+                sheetobj.write(_row,1, label ='输出')
+                for i in test[2]['o']:
+                    sheetobj.write(_row,2, label =i)
+                    _row+=1       
+
+                sheetobj.write(_row,1, label ='输入示例')
+                for i in test[2]['ie']:
+                    sheetobj.write(_row,2, label =i)
+                    _row+=1
+
+                sheetobj.write(_row,1, label ='输出示例')
+                for i in test[2]['oe']:
+                    sheetobj.write(_row,2, label =i)
+                    _row+=1
+
+                if 't' in test[2]:#有无提示
+                    sheetobj.write(_row,1, label ='提示')
+                    for i in test[2]['t']:
+                        sheetobj.write(_row,2, label =i)
+                        _row+=1
+
+                if 's' in test[2]:#有无来源
+                    sheetobj.write(_row,1, label ='来源')
+                    sheetobj.write(_row,2, xlwt.Formula('HYPERLINK("%s";"%s")' % test[2]['s']))
+                    _row+=1
     pass
+
+def fstr(str,replace=''):
+    if(str):
+        r1 = re.compile(r'&nbsp|\$|_|\xa0|\\xa0')
+        r2 = re.compile(r'\t|\r\n|\r|\n')
+        str = r1.sub('',str)
+        str = r2.sub(replace,str)
+    return(str)
 
 if __name__ == "__main__":
-    main()
+    analyze_index()
